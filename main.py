@@ -231,7 +231,7 @@ def train(condition, subject):
     ax.plot(hist_loss)
     plt.savefig(f"fig/{condition}_S{subject}_hist_loss.pdf")
 
-    figset, ax = plt.subplots()
+    fig, ax = plt.subplots()
     ax.set_title(f"{condition} - S{subject} - Accuracy")
     ax.plot(hist_acc)
     plt.savefig(f"fig/{condition}_S{subject}_hist_acc.pdf")
