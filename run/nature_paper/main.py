@@ -29,7 +29,7 @@ class Net(nn.Module):
         return logits
 
 
-def get_files(condition, action, subject):
+def get_files(data_folder, condition, action, subject):
 
     if subject == 1:
         sbj = ""
@@ -71,7 +71,7 @@ def get_files(condition, action, subject):
         raise ValueError
 
 
-    files = glob.glob(f"data/{condition}/{fp}")
+    files = glob.glob(f"{data_folder}/{condition}/{fp}")
     assert len(files), f"No files found with pattern {fp} for condition {condition}"
     return files
 
@@ -105,7 +105,7 @@ class Dataset(torch.utils.data.Dataset):
         return x, y
 
 
-def get_data(condition, subject):
+def get_data(data_folder, condition, subject):
 
     actions = get_actions(condition)
 
@@ -114,7 +114,8 @@ def get_data(condition, subject):
     len_records = []
 
     for a in actions:
-        for f in get_files(condition=condition, action=a, subject=subject):
+        for f in get_files(data_folder=data_folder,
+                           condition=condition, action=a, subject=subject):
             df_f = pd.read_csv(f, header=None)
             len_records.append(df_f.shape[-1])
 
@@ -129,7 +130,9 @@ def get_data(condition, subject):
 
     i = 0
     for a in actions:
-        for f in get_files(condition=condition, action=a, subject=subject):
+        for f in get_files(
+                data_folder=data_folder,
+                condition=condition, action=a, subject=subject):
             df_f = pd.read_csv(f, header=None)
             x[i] = df_f.mean()[:shortest_seq]
             y[i] = actions.index(a)
@@ -160,9 +163,10 @@ def evaluate(model, dataloader):
     return acc
 
 
-def train(condition, subject):
+def train(data_folder, fig_folder,
+          condition, subject):
 
-    data = get_data(condition=condition, subject=subject)
+    data = get_data(data_folder=data_folder, condition=condition, subject=subject)
     n_obs = len(data)
 
     n_training = int(0.80*n_obs)
@@ -225,16 +229,16 @@ def train(condition, subject):
         acc = metric.compute()
         hist_acc.append(acc.item())
 
-    os.makedirs("fig", exist_ok=True)
+    os.makedirs(fig_folder, exist_ok=True)
     fig, ax = plt.subplots()
     ax.set_title(f"{condition} - S{subject} - Loss (CE)")
     ax.plot(hist_loss)
-    plt.savefig(f"fig/{condition}_S{subject}_hist_loss.pdf")
+    plt.savefig(f"{fig_folder}/{condition}_S{subject}_hist_loss.pdf")
 
     fig, ax = plt.subplots()
     ax.set_title(f"{condition} - S{subject} - Accuracy")
     ax.plot(hist_acc)
-    plt.savefig(f"fig/{condition}_S{subject}_hist_acc.pdf")
+    plt.savefig(f"{fig_folder}/{condition}_S{subject}_hist_acc.pdf")
 
     acc = evaluate(model, train_dataloader)
     print(f"[{condition} S{subject}] Accuracy AFTER training on TRAINING = {acc}")
@@ -244,11 +248,17 @@ def train(condition, subject):
 
 
 def main():
+
+    data_folder = "../../data/nature_paper"
+    fig_folder = "../../fig/nature_paper"
+
     conditions = "IRS-OFF-CorridorJunction", "IRS-OFF-Multifloor", "IRS-ON-CorridorJunction", "IRS-ON-Multifloor"
 
     for condition in conditions:
         for subject in (1, 2):
-            train(condition=condition, subject=subject)
+            train(data_folder=data_folder,
+                  fig_folder=fig_folder,
+                  condition=condition, subject=subject)
 
 if __name__ == "__main__":
     main()
