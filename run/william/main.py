@@ -1,14 +1,12 @@
 import pandas as pd
-import numpy as np
 import glob
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torchmetrics
 import os
-
+from scipy import signal
 
 CONDITIONS = conditions = "IRS-OFF-CorridorJunction", "IRS-OFF-Multifloor", "IRS-ON-CorridorJunction", "IRS-ON-Multifloor"
 
@@ -21,8 +19,7 @@ class Net(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_layer_size, hidden_layer_size),
             nn.ReLU(),
-            nn.Linear(hidden_layer_size, len_ouput),
-        )
+            nn.Linear(hidden_layer_size, len_ouput))
 
     def forward(self, x):
         logits = self.linear_relu_stack(x)
@@ -81,8 +78,8 @@ class Dataset(torch.utils.data.Dataset):
 
     def __init__(self, x, y):
         'Initialization'
-        self.x = torch.from_numpy(x).float()
-        self.y = torch.from_numpy(y).long()
+        self.x = torch.from_numpy(x.copy()).float()
+        self.y = torch.from_numpy(y.copy()).long()
 
     def __len__(self):
         'Denotes the total number of samples'
@@ -103,16 +100,23 @@ def get_data(data_folder):
 
     idx_data = df.columns[1:]
 
-    labels =  list(df.label.unique())
+    labels = list(df.label.unique())
     print(f"N labels = {len(labels)}")
 
-    n_obs = len(df)
-    n_feature = len(idx_data)
+    # n_obs = len(df)
+    # n_feature = len(idx_data)
 
-    x = df[idx_data].to_numpy()
+    x = df[idx_data].values
+
+    x = signal.decimate(x, 4, axis=1)
+
+    print(df.label.value_counts())
 
     df.label = pd.Categorical(df.label)
-    y = df.label.cat.codes.to_numpy()
+    y = df.label.cat.codes.values
+
+    print("number of label 0", len(y) - y.sum())
+    print("number of label 1", y.sum())
 
     print("X shape", x.shape)
 
@@ -125,29 +129,36 @@ def evaluate(model, dataloader):
     # initialize metric
     metric = torchmetrics.Accuracy()
 
-    for i, data in enumerate(dataloader):
-        # Every data instance is an input + label pair
-        inputs, labels = data
+    with torch.no_grad():
 
-        # Make predictions for this batch
-        outputs = model(inputs)
-        preds = outputs.softmax(dim=-1)
+        for i, data in enumerate(dataloader):
+            # every data instance is an input + label pair
+            inputs, labels = data
 
-        # metric on current batch
-        acc = metric(preds, labels)
+            # make predictions for this batch
+            outputs = model(inputs)
+            preds = outputs.softmax(dim=-1)
 
-    acc = metric.compute()
+            # metric on current batch
+            _ = metric(preds, labels)
+
+        acc = metric.compute()
 
     return acc
 
 
-def train(data_folder, fig_folder):
+def train(data_folder, fig_folder, seed):
+
+    torch.manual_seed(seed)
 
     data = get_data(data_folder=data_folder)
     n_obs = len(data)
 
-    n_training = int(0.80*n_obs)
+    n_training = int(0.8*n_obs)
     n_val = n_obs - n_training
+
+    print("n training", n_training)
+    print("n val", n_val)
 
     training_data, val_data = torch.utils.data.random_split(data, [n_training, n_val])
 
@@ -159,8 +170,9 @@ def train(data_folder, fig_folder):
                                                  batch_size=len(training_data),
                                                  shuffle=True)
 
+    n_label = len(data.y.unique())
     model = Net(len_input=data.x.shape[-1],
-                len_ouput=len(data.y.unique()))
+                len_ouput=n_label)
 
     acc = evaluate(model, train_dataloader)
     print(f"Accuracy before training on TRAINING = {acc}")
@@ -172,7 +184,7 @@ def train(data_folder, fig_folder):
 
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 
-    n_epochs = 10000
+    n_epochs = 1000
     hist_loss = []
     hist_acc = []
 
@@ -230,7 +242,9 @@ def main():
     fig_folder = "../../fig/william"
 
     train(data_folder=data_folder,
-          fig_folder=fig_folder)
+          fig_folder=fig_folder,
+          seed=123)
+
 
 if __name__ == "__main__":
     main()
