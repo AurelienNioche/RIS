@@ -1,5 +1,4 @@
 import pandas as pd
-import glob
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import torch
@@ -8,120 +7,57 @@ import torchmetrics
 import os
 from scipy import signal
 
-CONDITIONS = conditions = "IRS-OFF-CorridorJunction", "IRS-OFF-Multifloor", "IRS-ON-CorridorJunction", "IRS-ON-Multifloor"
-
 
 class Net(nn.Module):
-    def __init__(self, len_input, len_ouput, hidden_layer_size=512):
+    def __init__(self, len_input, len_output, hidden_layer_size=512):
         super().__init__()
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(len_input, hidden_layer_size),
             nn.ReLU(),
             nn.Linear(hidden_layer_size, hidden_layer_size),
             nn.ReLU(),
-            nn.Linear(hidden_layer_size, len_ouput))
+            nn.Linear(hidden_layer_size, len_output))
 
     def forward(self, x):
         logits = self.linear_relu_stack(x)
         return logits
 
 
-def get_files(data_folder, condition, action, subject):
-
-    if subject == 1:
-        sbj = ""
-    elif subject == 2:
-        sbj = "S2"
-    else:
-        raise ValueError
-
-
-    if condition == "IRS-OFF-CorridorJunction":
-        if action == "Empty":
-            fp = "IRS_OFF_Empty_Rx*.csv"
-        elif action == "Sitting" and subject == 1:
-            fp = "IRS_OF_Sitting_Tx*.csv"
-        elif action == "Standing" and subject == 1:
-            fp = "IRS_OF_Standing_Tx*.csv"
-        else:
-            fp = f"IRS_OFF_{action}{sbj}_Tx*.csv"
-
-    elif condition == "IRS-OFF-Multifloor":
-        if action == "Empty":
-            fp = "EmptyOFF_*.csv"
-        else:
-            fp = f"{action}{sbj}_IRS-OFF_*.csv"
-
-    elif condition == "IRS-ON-CorridorJunction":
-        if action == "Empty":
-            raise ValueError
-        else:
-            fp = f"IRS_ON_{action}{sbj}_Tx*.csv"
-
-    elif condition == "IRS-ON-Multifloor":
-        if action == "Empty":
-            fp = "Empty_*.csv"
-        else:
-            fp = f"{action}{sbj}_IRS-ON_*.csv"
-
-    else:
-        raise ValueError
-
-
-    files = glob.glob(f"{data_folder}/{condition}/{fp}")
-    assert len(files), f"No files found with pattern {fp} for condition {condition}"
-    return files
-
-
 class Dataset(torch.utils.data.Dataset):
-    'Characterizes a dataset for PyTorch'
+    """Characterizes a dataset for PyTorch"""
 
-    def __init__(self, x, y):
-        'Initialization'
-        self.x = torch.from_numpy(x.copy()).float()
-        self.y = torch.from_numpy(y.copy()).long()
+    def __init__(self, data_file, decimate_factor=4):
+        """Initialization"""
+        self.x, self.y = self.load_data(data_file, decimate_factor)
 
     def __len__(self):
-        'Denotes the total number of samples'
+        """Denotes the total number of samples"""
         return len(self.y)
 
     def __getitem__(self, index):
-        'Generates one sample of data'
+        """Generates one sample of data"""
         # Select sample
         x = self.x[index]
         y = self.y[index]
         return x, y
 
+    @staticmethod
+    def load_data(data_file, decimate_factor):
 
-def get_data(data_folder):
+        df = pd.read_csv(data_file, index_col=0)
 
-    f_name = f'{data_folder}/preprocessed_data.csv'
-    df = pd.read_csv(f_name, index_col=0)
+        idx_data = df.columns[1:]
 
-    idx_data = df.columns[1:]
+        x = df[idx_data].values
 
-    labels = list(df.label.unique())
-    print(f"N labels = {len(labels)}")
+        x = signal.decimate(x, decimate_factor, axis=1)
 
-    # n_obs = len(df)
-    # n_feature = len(idx_data)
+        df.label = pd.Categorical(df.label)
+        y = df.label.cat.codes.values
 
-    x = df[idx_data].values
-
-    x = signal.decimate(x, 4, axis=1)
-
-    print(df.label.value_counts())
-
-    df.label = pd.Categorical(df.label)
-    y = df.label.cat.codes.values
-
-    print("number of label 0", len(y) - y.sum())
-    print("number of label 1", y.sum())
-
-    print("X shape", x.shape)
-
-    training_data = Dataset(x, y)
-    return training_data
+        x = torch.from_numpy(x.copy()).float()
+        y = torch.from_numpy(y.copy()).long()
+        return x, y
 
 
 def evaluate(model, dataloader):
@@ -137,21 +73,21 @@ def evaluate(model, dataloader):
 
             # make predictions for this batch
             outputs = model(inputs)
-            preds = outputs.softmax(dim=-1)
+            pred = outputs.softmax(dim=-1)
 
             # metric on current batch
-            _ = metric(preds, labels)
+            _ = metric(pred, labels)
 
         acc = metric.compute()
 
     return acc
 
 
-def train(data_folder, fig_folder, seed):
+def train(data_file, fig_folder, seed):
 
     torch.manual_seed(seed)
 
-    data = get_data(data_folder=data_folder)
+    data = Dataset(data_file=data_file)
     n_obs = len(data)
 
     n_training = int(0.8*n_obs)
@@ -172,7 +108,7 @@ def train(data_folder, fig_folder, seed):
 
     n_label = len(data.y.unique())
     model = Net(len_input=data.x.shape[-1],
-                len_ouput=n_label)
+                len_output=n_label)
 
     acc = evaluate(model, train_dataloader)
     print(f"Accuracy before training on TRAINING = {acc}")
@@ -182,7 +118,8 @@ def train(data_folder, fig_folder, seed):
 
     loss_fn = torch.nn.CrossEntropyLoss()
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
 
     n_epochs = 1000
     hist_loss = []
@@ -191,32 +128,35 @@ def train(data_folder, fig_folder, seed):
     # initialize metric
     metric = torchmetrics.Accuracy()
 
-    for _ in tqdm(range(n_epochs)):
-        for i, data in enumerate(train_dataloader):
-            # Every data instance is an input + label pair
-            inputs, labels = data
+    with tqdm(total=n_epochs) as pbar:
+        for _ in range(n_epochs):
+            for i, data in enumerate(train_dataloader):
+                # Every data instance is an input + label pair
+                inputs, labels = data
 
-            # Zero your gradients for every batch!
-            optimizer.zero_grad()
+                # Zero your gradients for every batch!
+                optimizer.zero_grad()
 
-            # Make predictions for this batch
-            outputs = model(inputs)
+                # Make predictions for this batch
+                outputs = model(inputs)
 
-            # Compute the loss and its gradients
-            loss = loss_fn(outputs, labels)
-            loss.backward()
+                # Compute the loss and its gradients
+                loss = loss_fn(outputs, labels)
+                loss.backward()
 
-            hist_loss.append(loss.item())
+                hist_loss.append(loss.item())
 
-            # Adjust learning weights
-            optimizer.step()
+                # Adjust learning weights
+                optimizer.step()
 
-            # Compute metric on current batch
-            preds = outputs.softmax(dim=-1)
-            _ = metric(preds, labels)
+                # Compute metric on current batch
+                preds = outputs.softmax(dim=-1)
+                _ = metric(preds, labels)
 
-        acc = metric.compute()
-        hist_acc.append(acc.item())
+            acc = metric.compute()
+            hist_acc.append(acc.item())
+            pbar.set_postfix(acc=acc.item())
+            pbar.update()
 
     os.makedirs(fig_folder, exist_ok=True)
     fig, ax = plt.subplots()
@@ -238,14 +178,15 @@ def train(data_folder, fig_folder, seed):
 
 def main():
 
-    data_folder = "../../data/william"
+    data_file = "../../data/william/preprocessed_data.csv"
     fig_folder = "../../fig/william"
 
-    train(data_folder=data_folder,
+    seed = 12
+
+    train(data_file=data_file,
           fig_folder=fig_folder,
-          seed=123)
+          seed=seed)
 
 
 if __name__ == "__main__":
     main()
-
