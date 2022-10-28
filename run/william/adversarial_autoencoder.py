@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import torch
 import torch.nn as nn
-from scipy import signal
 import itertools
 
 
@@ -29,14 +28,11 @@ class Dataset(torch.utils.data.Dataset):
     def load_datasets(cls, data_file):
         df = pd.read_csv(data_file, index_col=0)
 
-        idx_data = df.columns[1:]
-
         labels = list(df.label.unique())
 
         training_data = {}
         for label in labels:
-            x = df[df.label == label][idx_data].values
-            x = signal.decimate(x, 4, axis=1)
+            x = df[df.label == label].iloc[:, 1:].values
             training_data[label] = cls(x)
         return training_data
 
@@ -167,11 +163,15 @@ def generate(n_sample, latent_dim, epoch, folder, decoder):
     plt.close()
 
 
-def train(condition, dataset,
-          latent_dim, n_epochs, lr, b1, b2, sample_interval,
-          n_sample,
-          fig_folder,
-          bkp_folder):
+def train(dataset,
+          latent_dim,
+          n_epochs,
+          lr_generation,
+          lr_discrimination,
+          sample_interval=None,  # only for plotting
+          n_sample=None,         # only for plotting
+          fig_folder=None,       # only for plotting
+          bkp_folder=None):
 
     # Use binary cross-entropy loss
     adversarial_loss = torch.nn.BCELoss()
@@ -181,7 +181,13 @@ def train(condition, dataset,
     batch_size = len(dataset)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    input_dim = dataset.x.shape[1]
+    if isinstance(dataset, torch.utils.data.Subset):
+        attr_dataset = dataset.dataset
+        while isinstance(attr_dataset, torch.utils.data.Subset):
+            attr_dataset = attr_dataset.dataset
+        input_dim = attr_dataset.x.shape[1]
+    else:
+        input_dim = dataset.x.shape[1]
 
     # Initialize generator and discriminator
     encoder = Encoder(input_dim=input_dim, latent_dim=latent_dim)
@@ -189,13 +195,13 @@ def train(condition, dataset,
     discriminator = Discriminator(latent_dim=latent_dim)
 
     opt_gen = torch.optim.Adam(
-        itertools.chain(encoder.parameters(), decoder.parameters()), lr=lr, betas=(b1, b2))
+        itertools.chain(encoder.parameters(), decoder.parameters()), lr=lr_generation)
 
-    opt_dsc = torch.optim.Adam(discriminator.parameters(), lr=lr, betas=(b1, b2))
+    opt_dsc = torch.optim.Adam(discriminator.parameters(), lr=lr_discrimination)
 
     hist_loss = {k: [] for k in ("generation", "discrimination")}
 
-    with tqdm(total=n_epochs, desc=condition) as pbar:
+    with tqdm(total=n_epochs) as pbar:
         for epoch in range(n_epochs):
 
             for _, (x, _) in enumerate(dataloader):
@@ -246,51 +252,83 @@ def train(condition, dataset,
                 hist_loss["generation"].append(g_loss.item())
                 hist_loss["discrimination"].append(d_loss.item())
 
-            if epoch > 0 and epoch % sample_interval == 0:
+            if fig_folder is not None and epoch > 0 and epoch % sample_interval == 0:
                 generate(n_sample=n_sample, epoch=epoch,
                          decoder=decoder,
                          latent_dim=latent_dim,
-                         folder=f"{fig_folder}/generated/{condition}/")
+                         folder=f"{fig_folder}/generated/")
 
             pbar.set_postfix(
                 loss_gen=g_loss.item(),
                 loss_dsc=d_loss.item())
             pbar.update()
 
-    for k, loss in hist_loss.items():
-        folder = f"{fig_folder}/loss/{condition}"
-        os.makedirs(folder, exist_ok=True)
-        fig, ax = plt.subplots()
-        ax.set_title(f"Loss {k}")
-        ax.plot(loss)
-        plt.tight_layout()
-        plt.savefig(f"{folder}/loss_{k}.pdf")
-        plt.close()
+    # Generating figures of loss curves
+    if fig_folder is not None:
+        for k, loss in hist_loss.items():
+            folder = f"{fig_folder}/loss"
+            os.makedirs(folder, exist_ok=True)
+            fig, ax = plt.subplots()
+            ax.set_title(f"Loss {k}")
+            ax.plot(loss)
+            plt.tight_layout()
+            plt.savefig(f"{folder}/loss_{k}.pdf")
+            plt.close()
 
-    models = [encoder, decoder, discriminator]
-    for m in models:
-        m.save(folder=f"{bkp_folder}/{condition}")
+    if bkp_folder is not None:
+        models = [encoder, decoder, discriminator]
+        for m in models:
+            m.save(folder=bkp_folder)
+
+    encoder.eval()
+    decoder.eval()
+    discriminator.eval()
+
+    # Generating reconstruction figures
+    if fig_folder is not None:
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=len(dataset), shuffle=False)
+
+        for _, (x, _) in enumerate(dataloader):
+
+            decoded = decoder(encoder(x)).detach().numpy()
+            x = x.detach().numpy()
+
+            for i in tqdm(range(x.shape[0]), desc="Reconstructing"):
+
+                fig, axes = plt.subplots(ncols=2)
+                ax = axes[0]
+                ax.plot(x[i, :])
+                ax = axes[1]
+                ax.plot(decoded[i, :])
+
+                fig.tight_layout()
+
+                folder = f"{fig_folder}/reconstructed"
+                os.makedirs(folder, exist_ok=True)
+                plt.savefig(f"{folder}/{i}.png")
+                plt.close()
+
+    return encoder, decoder, discriminator
 
 
 def main():
 
     root_folder = "../.."
     data_file = f"{root_folder}/data/william/preprocessed_data.csv"
-    fig_folder = f"{root_folder}/fig/william"
+    fig_folder = f"{root_folder}/fig/william/adversarial_autoencoder"
     bkp_folder = f"{root_folder}/bkp/william/generative_models"
 
     for folder in fig_folder, bkp_folder:
         os.makedirs(folder, exist_ok=True)
 
     # For autoencoder
-    latent_dim = 3
+    latent_dim = 10
 
     # Optimizers
-    lr = 0.005
-    b1 = 0.3
-    b2 = 0.999
+    lr_generation = 0.001
+    lr_discrimination = 0.001
 
-    n_epochs = 1000
+    n_epochs = 2000
 
     sample_interval = 50
     n_sample = 5
@@ -299,13 +337,15 @@ def main():
 
     for condition, dataset in datasets.items():
         train(
-            condition=condition,  # "sitting", "standing"
             dataset=dataset,
             n_epochs=n_epochs,
-            lr=lr, b1=b1, b2=b2, latent_dim=latent_dim,
-            sample_interval=sample_interval, n_sample=n_sample,
-            bkp_folder=bkp_folder,
-            fig_folder=fig_folder)
+            lr_generation=lr_generation,
+            lr_discrimination=lr_discrimination,
+            latent_dim=latent_dim,
+            sample_interval=sample_interval,
+            n_sample=n_sample,
+            bkp_folder=f"{bkp_folder}/{condition}",
+            fig_folder=f"{fig_folder}/{condition}")
 
 
 if __name__ == "__main__":

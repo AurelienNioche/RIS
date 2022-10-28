@@ -57,6 +57,8 @@ def import_and_preprocess(files, label, pbar):
 
 def main():
 
+    decimate_factor = 50
+
     data_folder = "../../data/william/"
 
     labels = "standing", "sitting"
@@ -66,7 +68,7 @@ def main():
 
     n_files = [len(files[k]) for k in labels]
     for k, n in zip(labels, n_files):
-        print(f"{k} number of files", n)
+        print(f"{k.capitalize()} N =", n)
 
     print("Importing and preprocessing data")
 
@@ -80,20 +82,26 @@ def main():
                 import_and_preprocess(pbar=pbar, files=value, label=key))
 
     print("Creating dataframe")
-    full = pd.concat(data_list, axis=0, ignore_index=True, sort=False)
-    print(len(full))
+    df = pd.concat(data_list, axis=0, ignore_index=True, sort=False)
+    print("N =", len(df))
 
     print("Normalizing data")
 
-    idx = full.columns[1:]
-    data_full = full[idx].values
-    data_full -= data_full.mean()
-    data_full /= data_full.std()
-    full[idx] = data_full
+    x = df.iloc[:, 1:].values
+    x = (x - x.min()) / (x.max() - x.min())
+    x -= 0.5
+    x *= 2
+    # x -= x.mean()
+    # x /= x.std()
+
+    x = signal.decimate(x, decimate_factor, axis=1)
+
+    df2 = pd.DataFrame(x)
+    df2.insert(0, 'label', df.label)
 
     print("Writing file")
     f_name = f'{data_folder}/preprocessed_data.csv'
-    full.to_csv(f_name, index=True, header=True)
+    df2.to_csv(f_name, index=True, header=True)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,38 @@ import torch
 import torch.nn as nn
 import torchmetrics
 import os
-from scipy import signal
+
+
+class Dataset(torch.utils.data.Dataset):
+    """Characterizes a dataset for PyTorch"""
+
+    def __init__(self, data_file):
+        """Initialization"""
+        self.x, self.y = self.load_data(data_file)
+
+    def __len__(self):
+        """Denotes the total number of samples"""
+        return len(self.y)
+
+    def __getitem__(self, index):
+        """Generates one sample of data"""
+        x = self.x[index]
+        y = self.y[index]
+        return x, y
+
+    @staticmethod
+    def load_data(data_file):
+
+        df = pd.read_csv(data_file, index_col=0)
+
+        x = df.iloc[:, 1:].values
+
+        df.label = pd.Categorical(df.label)
+        y = df.label.cat.codes.values
+
+        x = torch.from_numpy(x.copy()).float()
+        y = torch.from_numpy(y.copy()).long()
+        return x, y
 
 
 class Net(nn.Module):
@@ -23,59 +54,16 @@ class Net(nn.Module):
         return logits
 
 
-class Dataset(torch.utils.data.Dataset):
-    """Characterizes a dataset for PyTorch"""
-
-    def __init__(self, data_file, decimate_factor=4):
-        """Initialization"""
-        self.x, self.y = self.load_data(data_file, decimate_factor)
-
-    def __len__(self):
-        """Denotes the total number of samples"""
-        return len(self.y)
-
-    def __getitem__(self, index):
-        """Generates one sample of data"""
-        # Select sample
-        x = self.x[index]
-        y = self.y[index]
-        return x, y
-
-    @staticmethod
-    def load_data(data_file, decimate_factor):
-
-        df = pd.read_csv(data_file, index_col=0)
-
-        idx_data = df.columns[1:]
-
-        x = df[idx_data].values
-
-        x = signal.decimate(x, decimate_factor, axis=1)
-
-        df.label = pd.Categorical(df.label)
-        y = df.label.cat.codes.values
-
-        x = torch.from_numpy(x.copy()).float()
-        y = torch.from_numpy(y.copy()).long()
-        return x, y
-
-
 def evaluate(model, dataloader):
 
     # initialize metric
     metric = torchmetrics.Accuracy()
 
     with torch.no_grad():
+        for inputs, labels in dataloader:
 
-        for i, data in enumerate(dataloader):
-            # every data instance is an input + label pair
-            inputs, labels = data
-
-            # make predictions for this batch
             outputs = model(inputs)
             pred = outputs.softmax(dim=-1)
-
-            # metric on current batch
             _ = metric(pred, labels)
 
         acc = metric.compute()
@@ -130,9 +118,7 @@ def train(data_file, fig_folder, seed):
 
     with tqdm(total=n_epochs) as pbar:
         for _ in range(n_epochs):
-            for i, data in enumerate(train_dataloader):
-                # Every data instance is an input + label pair
-                inputs, labels = data
+            for inputs, labels in train_dataloader:
 
                 # Zero your gradients for every batch!
                 optimizer.zero_grad()
@@ -162,12 +148,12 @@ def train(data_file, fig_folder, seed):
     fig, ax = plt.subplots()
     ax.set_title(f"Loss (CE)")
     ax.plot(hist_loss)
-    plt.savefig(f"{fig_folder}/hist_loss.pdf")
+    plt.savefig(f"{fig_folder}/hist_loss.png")
 
     fig, ax = plt.subplots()
     ax.set_title(f"Accuracy")
     ax.plot(hist_acc)
-    plt.savefig(f"{fig_folder}/hist_acc.pdf")
+    plt.savefig(f"{fig_folder}/hist_acc.png")
 
     acc = evaluate(model, train_dataloader)
     print(f"Accuracy AFTER training on TRAINING = {acc}")
@@ -179,7 +165,7 @@ def train(data_file, fig_folder, seed):
 def main():
 
     data_file = "../../data/william/preprocessed_data.csv"
-    fig_folder = "../../fig/william"
+    fig_folder = "../../fig/william/main"
 
     seed = 12
 

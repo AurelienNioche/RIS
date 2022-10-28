@@ -1,11 +1,12 @@
-import os
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 import torch
 import numpy as np
 from sklearn.model_selection import KFold
+import pandas as pd
+import os
 
 from main import Net, Dataset, evaluate
+from adversarial_autoencoder import Encoder, Decoder
 
 
 def reset_weights(m):
@@ -14,13 +15,14 @@ def reset_weights(m):
         m.reset_parameters()
 
 
-def train(data_file, fig_folder, seed, k_folds, n_epochs,
+def train(data_file, gen_data_file, seed, k_folds, n_epochs,
           learning_rate):
 
     torch.manual_seed(seed)
     np.random.seed(seed)  # for sklearn
 
     dataset = Dataset(data_file=data_file)
+    gen_dataset = Dataset(data_file=gen_data_file)
 
     kfold = KFold(n_splits=k_folds, shuffle=True)
 
@@ -37,20 +39,19 @@ def train(data_file, fig_folder, seed, k_folds, n_epochs,
         train_dataset = torch.utils.data.Subset(dataset, train_idx)
         test_dataset = torch.utils.data.Subset(dataset, test_idx)
 
+        train_dataset = torch.utils.data.ConcatDataset([train_dataset, gen_dataset])
+
         train_loader = torch.utils.data.DataLoader(
             train_dataset,
-            batch_size=len(train_idx))
+            batch_size=len(train_dataset), shuffle=True)
         test_loader = torch.utils.data.DataLoader(
             test_dataset,
-            batch_size=len(test_idx))
+            batch_size=len(test_dataset))
 
         model.apply(reset_weights)
-        # optimizer = torch.optim.RMSprop(model.parameters(), lr=0.01)
+
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         # optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-
-        hist_acc = []
-        hist_loss = []
 
         with tqdm(total=n_epochs, desc=f"Fold {fold+1}/{k_folds}") as pbar:
             for _ in range(n_epochs):
@@ -71,33 +72,16 @@ def train(data_file, fig_folder, seed, k_folds, n_epochs,
                     # Adjust learning weights
                     optimizer.step()
 
-                acc_training = evaluate(model, train_loader).item()
-                acc_validation = evaluate(model, test_loader).item()
-                pbar.set_postfix(acc_training=acc_training, acc_validation=acc_validation)
+                acc = evaluate(model=model, dataloader=train_loader).item()
+                pbar.set_postfix(acc=acc)
                 pbar.update()
 
-                hist_loss.append(loss.item())
-                hist_acc.append(acc_training)
+            acc = evaluate(model, train_loader).item()
+            folds_acc["training"].append(acc)
 
-            train_acc = evaluate(model, train_loader).item()
-            val_acc = evaluate(model, test_loader).item()
-            folds_acc["validation"].append(val_acc)
-            folds_acc["training"].append(train_acc)
-            pbar.set_postfix(acc_training=train_acc, acc_validation=val_acc)
-
-            fig_folder_fold = f"{fig_folder}/fold{fold+1}"
-            os.makedirs(fig_folder_fold, exist_ok=True)
-            fig, ax = plt.subplots()
-            ax.set_title(f"Loss (CE)")
-            ax.plot(hist_loss)
-            plt.savefig(f"{fig_folder_fold}/hist_loss.png")
-            plt.close()
-
-            fig, ax = plt.subplots()
-            ax.set_title(f"Accuracy")
-            ax.plot(hist_acc)
-            plt.savefig(f"{fig_folder_fold}/hist_acc.png")
-            plt.close()
+            acc = evaluate(model, test_loader).item()
+            folds_acc["validation"].append(acc)
+            pbar.set_postfix(acc_validation=acc)
 
     for k, v in folds_acc.items():
         print(f"{k.capitalize()} accuracy: {np.mean(v):.3f} (+/-{np.std(v):.3f})")
@@ -106,18 +90,41 @@ def train(data_file, fig_folder, seed, k_folds, n_epochs,
 def main():
 
     data_file = "../../data/william/preprocessed_data.csv"
-    fig_folder = "../../fig/william/k_fold"
+    gen_data_file = "../../data/william/generated_data.csv"
+    file_for_export = f'../../data/william/generated_data.csv'
+    bkp_folder = f"../../bkp/william/generative_models"
 
-    k_folds = 350
+    n = 10000
+
+    k_folds = 10
     seed = 1234
-    n_epochs = 300
-    learning_rate = 0.1
+    n_epochs = 200
+    learning_rate = 0.01
+
+    conditions = [x[0].split("/")[-1] for x in os.walk(bkp_folder)][1:]
+
+    df_list = []
+
+    for cond in conditions:
+        folder = f"{bkp_folder}/{cond}"
+        encoder = Encoder.load(folder=folder)
+        decoder = Decoder.load(folder=folder)
+        z = torch.randn((n // 2, encoder.latent_dim))
+        samples = decoder(z).detach().numpy()
+
+        df = pd.DataFrame(samples)
+        df.insert(0, 'label', cond)
+
+        df_list.append(df)
+
+    gen_data = pd.concat(df_list, axis=0, ignore_index=True, sort=False)
+    gen_data.to_csv(file_for_export, index=True, header=True)
 
     train(data_file=data_file,
-          fig_folder=fig_folder,
           seed=seed,
           k_folds=k_folds,
           n_epochs=n_epochs,
+          gen_data_file=gen_data_file,
           learning_rate=learning_rate)
 
 
