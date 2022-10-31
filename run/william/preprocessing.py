@@ -87,16 +87,21 @@ def main():
 
     print("Normalizing data")
 
-    x = df.iloc[:, 1:].values
-    x = (x - x.min()) / (x.max() - x.min())
-    x -= 0.5
-    x *= 2
+    len_data = len(df)
+    data = df.iloc[:, 1:].values
+    for i in range(len_data):
+        x = data[i]
+        x = (x - x.min()) / (x.max() - x.min())
+        x -= 0.5
+        x *= 2
+        data[i] = x
+
     # x -= x.mean()
     # x /= x.std()
 
-    x = signal.decimate(x, decimate_factor, axis=1)
+    data = signal.decimate(data, decimate_factor, axis=1)
 
-    df2 = pd.DataFrame(x)
+    df2 = pd.DataFrame(data)
     df2.insert(0, 'label', df.label)
 
     print("Writing file")

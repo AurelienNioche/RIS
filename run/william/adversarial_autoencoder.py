@@ -175,6 +175,7 @@ def train(dataset,
 
     # Use binary cross-entropy loss
     adversarial_loss = torch.nn.BCELoss()
+    # Use Mean Squared Error Loss
     reconstruction_loss = torch.nn.MSELoss()
 
     # Configure data loader
