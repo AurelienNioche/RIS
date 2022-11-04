@@ -168,17 +168,17 @@ def train(data_file,
 
 def main():
 
-    data_file = "../../data/william/preprocessed_data.csv"
+    data_file = "../../data/william/dataset2/preprocessed_data.csv"
 
     k_folds = 10
     seed = 123
-    n_epochs = 300
-    learning_rate = 0.01
+    n_epochs = 1000
+    learning_rate = 0.005
 
-    gen__latent_dim = 3
-    gen__lr_generation = 0.001
-    gen__lr_discrimination = 0.001
-    gen__n_epochs = 150
+    gen__latent_dim = 10
+    gen__lr_generation = 0.0005
+    gen__lr_discrimination = 0.005
+    gen__n_epochs = 1000
     gen__n_sample = 20000
 
     train(data_file=data_file,

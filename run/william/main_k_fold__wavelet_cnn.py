@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from sklearn.model_selection import KFold
 
-from main_wavelet_cnn import Net, Dataset, evaluate
+from main__wavelet_cnn import Net, Dataset, evaluate
 
 
 def reset_weights(m):
@@ -104,8 +104,8 @@ def train(data_file, fig_folder, seed, k_folds, n_epochs,
 
 def main():
 
-    data_file = "../../data/william/preprocessed_data.csv"
-    fig_folder = "../../fig/william/k_fold"
+    data_file = "../../data/william/dataset2/preprocessed_data.csv"
+    fig_folder = "../../fig/william/k_fold__wavelet_cnn/dataset2"
 
     k_folds = 10
     seed = 123

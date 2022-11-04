@@ -105,7 +105,7 @@ def train(data_file, fig_folder, seed, k_folds, n_epochs,
 
 def main():
 
-    data_file = "../../data/william/preprocessed_data.csv"
+    data_file = "../../data/william/dataset1/preprocessed_data.csv"
     fig_folder = "../../fig/william/k_fold"
 
     k_folds = 10

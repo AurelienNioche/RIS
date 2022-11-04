@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -28,8 +29,9 @@ class Dataset(torch.utils.data.Dataset):
     def load_data(data_file):
 
         df = pd.read_csv(data_file, index_col=0)
+        data_columns = np.nonzero([c.isnumeric() for c in df.columns])[0]
 
-        x = df.iloc[:, 1:].values
+        x = df.iloc[:, data_columns].values
 
         df.label = pd.Categorical(df.label)
         y = df.label.cat.codes.values
@@ -86,22 +88,22 @@ def train(data_file, fig_folder, seed):
 
     training_data, val_data = torch.utils.data.random_split(data, [n_training, n_val])
 
-    train_dataloader = torch.utils.data.DataLoader(training_data,
-                                                   batch_size=len(training_data),
-                                                   shuffle=True)
+    train_loader = torch.utils.data.DataLoader(training_data,
+                                               batch_size=len(training_data),
+                                               shuffle=True)
 
-    val_dataloader = torch.utils.data.DataLoader(val_data,
-                                                 batch_size=len(training_data),
-                                                 shuffle=True)
+    val_loader = torch.utils.data.DataLoader(val_data,
+                                             batch_size=len(training_data),
+                                             shuffle=True)
 
     n_label = len(data.y.unique())
     model = Net(len_input=data.x.shape[-1],
                 len_output=n_label)
 
-    acc = evaluate(model, train_dataloader)
+    acc = evaluate(model, train_loader)
     print(f"Accuracy before training on TRAINING = {acc}")
 
-    acc = evaluate(model, val_dataloader)
+    acc = evaluate(model, val_loader)
     print(f"Accuracy before training on VALIDATION = {acc}")
 
     loss_fn = torch.nn.CrossEntropyLoss()
@@ -109,7 +111,7 @@ def train(data_file, fig_folder, seed):
     # optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
 
-    n_epochs = 1000
+    n_epochs = 2000
     hist_loss = []
     hist_acc = []
 
@@ -118,7 +120,7 @@ def train(data_file, fig_folder, seed):
 
     with tqdm(total=n_epochs) as pbar:
         for _ in range(n_epochs):
-            for inputs, labels in train_dataloader:
+            for inputs, labels in train_loader:
 
                 # Zero your gradients for every batch!
                 optimizer.zero_grad()
@@ -135,14 +137,12 @@ def train(data_file, fig_folder, seed):
                 # Adjust learning weights
                 optimizer.step()
 
-                # Compute metric on current batch
-                preds = outputs.softmax(dim=-1)
-                _ = metric(preds, labels)
-
-            acc = metric.compute()
-            hist_acc.append(acc.item())
-            pbar.set_postfix(acc=acc.item())
+            acc_training = evaluate(model, train_loader).item()
+            acc_validation = evaluate(model, val_loader).item()
+            pbar.set_postfix(acc_training=acc_training, acc_validation=acc_validation)
             pbar.update()
+
+            hist_acc.append(acc_training)
 
     os.makedirs(fig_folder, exist_ok=True)
     fig, ax = plt.subplots()
@@ -155,17 +155,17 @@ def train(data_file, fig_folder, seed):
     ax.plot(hist_acc)
     plt.savefig(f"{fig_folder}/hist_acc.png")
 
-    acc = evaluate(model, train_dataloader)
+    acc = evaluate(model, train_loader)
     print(f"Accuracy AFTER training on TRAINING = {acc}")
 
-    acc = evaluate(model, val_dataloader)
+    acc = evaluate(model, val_loader)
     print(f"Accuracy AFTER training on VALIDATION = {acc}")
 
 
 def main():
 
-    data_file = "../../data/william/preprocessed_data.csv"
-    fig_folder = "../../fig/william/main"
+    data_file = "../../data/william/dataset2/preprocessed_data.csv"
+    fig_folder = "../../fig/william/main/dataset2"
 
     seed = 12
 

@@ -44,7 +44,7 @@ def train(data_file, gen_data_file, seed, k_folds, n_epochs,
         train_loader = torch.utils.data.DataLoader(
             train_dataset,
             batch_size=len(train_dataset), shuffle=True)
-        test_loader = torch.utils.data.DataLoader(
+        val_loader = torch.utils.data.DataLoader(
             test_dataset,
             batch_size=len(test_dataset))
 
@@ -72,14 +72,15 @@ def train(data_file, gen_data_file, seed, k_folds, n_epochs,
                     # Adjust learning weights
                     optimizer.step()
 
-                acc = evaluate(model=model, dataloader=train_loader).item()
-                pbar.set_postfix(acc=acc)
+                acc_training = evaluate(model, train_loader).item()
+                acc_validation = evaluate(model, val_loader).item()
+                pbar.set_postfix(acc_training=acc_training, acc_validation=acc_validation)
                 pbar.update()
 
             acc = evaluate(model, train_loader).item()
             folds_acc["training"].append(acc)
 
-            acc = evaluate(model, test_loader).item()
+            acc = evaluate(model, val_loader).item()
             folds_acc["validation"].append(acc)
             pbar.set_postfix(acc_validation=acc)
 
@@ -89,10 +90,9 @@ def train(data_file, gen_data_file, seed, k_folds, n_epochs,
 
 def main():
 
-    data_file = "../../data/william/preprocessed_data.csv"
-    gen_data_file = "../../data/william/generated_data.csv"
-    file_for_export = f'../../data/william/generated_data.csv'
-    bkp_folder = f"../../bkp/william/generative_models"
+    data_file = "../../data/william/dataset2/preprocessed_data.csv"
+    file_for_export = f'../../data/william/dataset2/generated_data.csv'
+    bkp_folder = f"../../bkp/william/generative_models/dataset2"
 
     n = 10000
 
@@ -107,6 +107,9 @@ def main():
 
     for cond in conditions:
         folder = f"{bkp_folder}/{cond}"
+
+        assert os.path.exists(folder), "Need to run `adversarial_autoencoder` first to generate models"
+
         encoder = Encoder.load(folder=folder)
         decoder = Decoder.load(folder=folder)
         z = torch.randn((n // 2, encoder.latent_dim))
@@ -124,7 +127,7 @@ def main():
           seed=seed,
           k_folds=k_folds,
           n_epochs=n_epochs,
-          gen_data_file=gen_data_file,
+          gen_data_file=file_for_export,
           learning_rate=learning_rate)
 
 

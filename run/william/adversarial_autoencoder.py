@@ -5,6 +5,7 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 import itertools
+import numpy as np
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -30,9 +31,11 @@ class Dataset(torch.utils.data.Dataset):
 
         labels = list(df.label.unique())
 
+        data_columns = np.nonzero([c.isnumeric() for c in df.columns])[0]
+
         training_data = {}
         for label in labels:
-            x = df[df.label == label].iloc[:, 1:].values
+            x = df[df.label == label].iloc[:, data_columns].values
             training_data[label] = cls(x)
         return training_data
 
@@ -315,9 +318,9 @@ def train(dataset,
 def main():
 
     root_folder = "../.."
-    data_file = f"{root_folder}/data/william/preprocessed_data.csv"
-    fig_folder = f"{root_folder}/fig/william/adversarial_autoencoder"
-    bkp_folder = f"{root_folder}/bkp/william/generative_models"
+    data_file = f"{root_folder}/data/william/dataset2/preprocessed_data.csv"
+    fig_folder = f"{root_folder}/fig/william/adversarial_autoencoder/dataset2"
+    bkp_folder = f"{root_folder}/bkp/william/generative_models/dataset2"
 
     for folder in fig_folder, bkp_folder:
         os.makedirs(folder, exist_ok=True)
