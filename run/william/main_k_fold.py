@@ -105,12 +105,12 @@ def train(data_file, fig_folder, seed, k_folds, n_epochs,
 
 def main():
 
-    data_file = "../../data/william/dataset1/preprocessed_data.csv"
-    fig_folder = "../../fig/william/k_fold"
+    data_file = "../../data/william/dataset2/preprocessed_data.csv"
+    fig_folder = "../../fig/william/k_fold/dataset2"
 
     k_folds = 10
     seed = 123
-    n_epochs = 300
+    n_epochs = 1000
     learning_rate = 0.01
 
     train(data_file=data_file,
