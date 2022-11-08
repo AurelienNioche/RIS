@@ -164,10 +164,10 @@ def train(data_file, fig_folder, seed):
 
 def main():
 
-    data_file = "../../data/william/dataset2/preprocessed_data.csv"
+    data_file = "../../data/william/dataset2/preprocessed_data__no_decimate.csv"
     fig_folder = "../../fig/william/main/dataset2"
 
-    seed = 12
+    seed = 123
 
     train(data_file=data_file,
           fig_folder=fig_folder,
