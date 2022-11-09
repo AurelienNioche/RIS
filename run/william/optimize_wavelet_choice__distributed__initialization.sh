@@ -1,0 +1,2 @@
+mysql -u root -e "CREATE DATABASE IF NOT EXISTS optimize_wavelet_choice"
+optuna create-study --study-name "optimize_wavelet_choice" --storage "mysql://root@localhost/optimize_wavelet_choice" --direction "maximize"

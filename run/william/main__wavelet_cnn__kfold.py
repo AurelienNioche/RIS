@@ -113,7 +113,7 @@ def main():
     n_epochs = 300
     learning_rate = 0.005
     preprocess_kwargs = dict(
-        wavelet="morl",
+        wavelet="cgau8",
         scales=np.geomspace(10, 520, num=20, dtype=int),
         dt=1,
         decimate=5,
