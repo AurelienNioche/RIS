@@ -222,11 +222,12 @@ def train(data_file,
 
 def main():
 
-    wavelet = 'morl'  # 'cmor' # 'cgau6'
+    wavelet = 'cgau1'  # 'morl'  # 'cmor' # 'cgau6'
     scales = np.geomspace(10, 520, num=20, dtype=int)
     dt = 1
-    decimate = 5
-    select_every = 5
+
+    decimate = None
+    select_every = 10
 
     data_file = f"../../data/william/dataset2/preprocessed_data__no_decimate.csv"
     fig_folder = "../../fig/william/main__wavelet_cnn/dataset2"

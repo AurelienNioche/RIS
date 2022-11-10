@@ -113,11 +113,11 @@ def main():
     n_epochs = 300
     learning_rate = 0.005
     preprocess_kwargs = dict(
-        wavelet="cgau8",
+        wavelet="cgau1",
         scales=np.geomspace(10, 520, num=20, dtype=int),
         dt=1,
-        decimate=5,
-        select_every=5)
+        decimate=None,
+        select_every=10)
 
     train(
         preprocess_kwargs=preprocess_kwargs,
