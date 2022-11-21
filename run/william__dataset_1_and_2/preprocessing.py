@@ -8,13 +8,12 @@ from tqdm import tqdm
 def preprocessing(data):
 
     # Remove First Subcarrier
-    # data = data.iloc[1:]
-
-    data = data.iloc[0:26]
-    # # Flip sencond half of the subcarriers
-    # data_low = data.iloc[0:27]
-    # data_high = data.iloc[27:54] * -1
-    # data = pd.concat([data_low, data_high])
+    data = data.iloc[1:]
+    
+    # Flip sencond half of the subcarriers
+    data_low = data.iloc[0:27]
+    data_high = data.iloc[27:54] * -1
+    data = pd.concat([data_low, data_high])
 
     # Take the average of all the subcarriers
     data = data.mean(axis=0)
@@ -27,24 +26,22 @@ def preprocessing(data):
     avg = avg.to_frame()
     avg = avg.T
     avg = avg.iloc[0][0]
-    data -= avg
+    data = data - avg
+
+    # Multiply the data to make it look better on a graph
+    data = data * 10000
 
     # Apply median filter to reduce occational spikes in the data
     columns = len(data.columns)
-    data = data.to_numpy()
+    data = pd.DataFrame.to_numpy(data)
     data = np.reshape(data, columns)
-    data = signal.medfilt(data, kernel_size=99)  # 3)
+    data = signal.medfilt(data, kernel_size=3)
     data = pd.DataFrame(data).T
-
-    # TODO: William => Is it really necessary?
-    # Multiply the data to make it look better on a graph
-    data *= 10000
-
+    
     return data
 
 
-def import_and_preprocess(files, label, position, pbar):
-
+def import_and_preprocess(files, label, pbar):
     li = []
 
     for file in files:
@@ -55,45 +52,34 @@ def import_and_preprocess(files, label, position, pbar):
 
     data = pd.concat(li, axis=0, ignore_index=True, sort=False)
     data.insert(0, 'label', label)
-    data.insert(0, 'position', position)
     return data
 
 
 def main():
 
-    decimate_factor = 50  # None
+    decimate_factor = None  # 50
 
-    data_folder = "../../data/william/dataset3"
+    data_folder = "../../data/william/"
 
-    labels = ['BTHS1', 'BTHS2', 'OALR1', 'OALR2',
-              'BE1', 'BE2', 'BRIDGES1', 'BRIDGES2',
-              'KR1', 'KR2']
+    labels = "standing", "sitting"
 
-    positions = ['on', 'off']
+    files = {key: glob.glob(f"{data_folder}/{key.capitalize()}//*.csv")
+             for key in labels}
 
-    files = {pos: {lab: glob.glob(f"{data_folder}/{lab}-{pos}/*.csv")
-             for lab in labels} for pos in positions}
-
-    n_files = 0
-    for pos in positions:
-        for lab in labels:
-            n = len(files[pos][lab])
-            n_files += n
-            print(f"{pos}-{lab} N = {n}")
-
-    print(f"Total N = {n_files}")
+    n_files = [len(files[k]) for k in labels]
+    for k, n in zip(labels, n_files):
+        print(f"{k.capitalize()} N =", n)
 
     print("Importing and preprocessing data")
 
-    with tqdm(total=n_files) as pbar:
+    with tqdm(total=sum(n_files)) as pbar:
 
         data_list = []
 
-        for pos, value in files.items():
-            for lab, file_list in value.items():
+        for key, value in files.items():
 
-                data_list.append(
-                    import_and_preprocess(pbar=pbar, files=file_list, label=lab, position=pos))
+            data_list.append(
+                import_and_preprocess(pbar=pbar, files=value, label=key))
 
     print("Creating dataframe")
     df = pd.concat(data_list, axis=0, ignore_index=True, sort=False)
@@ -102,7 +88,7 @@ def main():
     print("Normalizing data")
 
     len_data = len(df)
-    data = df.iloc[:, 2:].values
+    data = df.iloc[:, 1:].values
     for i in range(len_data):
         x = data[i]
         x = (x - x.min()) / (x.max() - x.min())
@@ -110,21 +96,21 @@ def main():
         x *= 2
         data[i] = x
 
+    # x -= x.mean()
+    # x /= x.std()
+
     if decimate_factor is None:
         add = "__no_decimate"
     else:
-        add = f"__decimate_{decimate_factor}"
+        add = ""
         data = signal.decimate(data, decimate_factor, axis=1)
 
-        df_temp = pd.DataFrame(data)
-        df_temp.insert(0, 'label', df.label)
-        df_temp.insert(0, 'position', df.position)
-
-        df = df_temp
+    df2 = pd.DataFrame(data)
+    df2.insert(0, 'label', df.label)
 
     print("Writing file")
     f_name = f'{data_folder}/preprocessed_data{add}.csv'
-    df.to_csv(f_name, index=True, header=True)
+    df2.to_csv(f_name, index=True, header=True)
 
 
 if __name__ == "__main__":

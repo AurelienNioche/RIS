@@ -318,9 +318,9 @@ def train(dataset,
 def main():
 
     root_folder = "../.."
-    data_file = f"{root_folder}/data/william/dataset3/preprocessed_data__decimate_50.csv"
-    fig_folder = f"{root_folder}/fig/william/adversarial_autoencoder/dataset3"
-    bkp_folder = f"{root_folder}/bkp/william/generative_models/dataset3"
+    data_file = f"{root_folder}/data/william/dataset2/preprocessed_data.csv"
+    fig_folder = f"{root_folder}/fig/william/adversarial_autoencoder/dataset2"
+    bkp_folder = f"{root_folder}/bkp/william/generative_models/dataset2"
 
     for folder in fig_folder, bkp_folder:
         os.makedirs(folder, exist_ok=True)

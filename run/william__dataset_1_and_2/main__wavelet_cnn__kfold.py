@@ -105,13 +105,13 @@ def train(data_file, fig_folder, seed, k_folds, n_epochs,
 
 def main():
 
-    data_file = "../../data/william/dataset3/preprocessed_data__no_decimate.csv"
-    fig_folder = "../../fig/william/k_fold__wavelet_cnn/dataset3"
+    data_file = "../../data/william/dataset2/preprocessed_data__no_decimate.csv"
+    fig_folder = "../../fig/william/k_fold__wavelet_cnn/dataset2"
 
     k_folds = 10
     seed = 123
     n_epochs = 300
-    learning_rate = 0.0005
+    learning_rate = 0.005
     preprocess_kwargs = dict(
         wavelet="cgau1",
         scales=np.geomspace(10, 520, num=20, dtype=int),

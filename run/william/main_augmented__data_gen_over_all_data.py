@@ -90,16 +90,16 @@ def train(data_file, gen_data_file, seed, k_folds, n_epochs,
 
 def main():
 
-    data_file = "../../data/william/dataset2/preprocessed_data.csv"
-    file_for_export = f'../../data/william/dataset2/generated_data.csv'
-    bkp_folder = f"../../bkp/william/generative_models/dataset2"
+    data_file = "../../data/william/dataset3/preprocessed_data__decimate_50.csv"
+    file_for_export = f'../../data/william/dataset3/generated_data.csv'
+    bkp_folder = f"../../bkp/william/generative_models/dataset3"
 
     n = 10000
 
     k_folds = 10
     seed = 1234
     n_epochs = 200
-    learning_rate = 0.01
+    learning_rate = 0.001
 
     conditions = [x[0].split("/")[-1] for x in os.walk(bkp_folder)][1:]
 

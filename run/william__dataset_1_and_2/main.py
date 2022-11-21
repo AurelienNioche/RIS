@@ -115,6 +115,9 @@ def train(data_file, fig_folder, seed):
     hist_loss = []
     hist_acc = []
 
+    # initialize metric
+    metric = torchmetrics.Accuracy()
+
     with tqdm(total=n_epochs) as pbar:
         for _ in range(n_epochs):
             for inputs, labels in train_loader:
@@ -161,8 +164,8 @@ def train(data_file, fig_folder, seed):
 
 def main():
 
-    data_file = "../../data/william/dataset3/preprocessed_data__no_decimate.csv"
-    fig_folder = "../../fig/william/main/dataset3"
+    data_file = "../../data/william/dataset2/preprocessed_data__no_decimate.csv"
+    fig_folder = "../../fig/william/main/dataset2"
 
     seed = 123
 

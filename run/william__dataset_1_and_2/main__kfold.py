@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from sklearn.model_selection import KFold
 
-from main__wavelet_cnn import Net, Dataset, evaluate
+from main import Net, Dataset, evaluate
 
 
 def reset_weights(m):
@@ -15,18 +15,18 @@ def reset_weights(m):
 
 
 def train(data_file, fig_folder, seed, k_folds, n_epochs,
-          learning_rate,
-          preprocess_kwargs):
+          learning_rate):
 
     torch.manual_seed(seed)
     np.random.seed(seed)  # for sklearn
 
-    dataset = Dataset(data_file=data_file, **preprocess_kwargs)
+    dataset = Dataset(data_file=data_file)
 
     kfold = KFold(n_splits=k_folds, shuffle=True)
 
     n_label = len(dataset.y.unique())
-    model = Net(n_label=n_label)
+    model = Net(len_input=dataset.x.shape[-1],
+                len_output=n_label)
 
     loss_fn = torch.nn.CrossEntropyLoss()
 
@@ -105,28 +105,20 @@ def train(data_file, fig_folder, seed, k_folds, n_epochs,
 
 def main():
 
-    data_file = "../../data/william/dataset3/preprocessed_data__no_decimate.csv"
-    fig_folder = "../../fig/william/k_fold__wavelet_cnn/dataset3"
+    data_file = "../../data/william/dataset2/preprocessed_data.csv"
+    fig_folder = "../../fig/william/k_fold/dataset2"
 
     k_folds = 10
     seed = 123
-    n_epochs = 300
-    learning_rate = 0.0005
-    preprocess_kwargs = dict(
-        wavelet="cgau1",
-        scales=np.geomspace(10, 520, num=20, dtype=int),
-        dt=1,
-        decimate=None,
-        select_every=10)
+    n_epochs = 1000
+    learning_rate = 0.01
 
-    train(
-        preprocess_kwargs=preprocess_kwargs,
-        data_file=data_file,
-        fig_folder=fig_folder,
-        seed=seed,
-        k_folds=k_folds,
-        n_epochs=n_epochs,
-        learning_rate=learning_rate)
+    train(data_file=data_file,
+          fig_folder=fig_folder,
+          seed=seed,
+          k_folds=k_folds,
+          n_epochs=n_epochs,
+          learning_rate=learning_rate)
 
 
 if __name__ == "__main__":

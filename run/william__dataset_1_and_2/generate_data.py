@@ -6,9 +6,8 @@ from adversarial_autoencoder import Decoder, Encoder
 
 def main():
 
-    file_for_export = f'../../data/william/dataset3/generated_data.csv'
-    bkp_folder = f"../../bkp/william/dataset3/generative_models"
-    assert os.path.exists(bkp_folder), "Need to run `adversarial_autoencoder`"
+    file_for_export = f'../../data/william/generated_data.csv'
+    bkp_folder = f"../../bkp/william/generative_models"
     conditions = [x[0].split("/")[-1] for x in os.walk(bkp_folder)][1:]
 
     n = 10000

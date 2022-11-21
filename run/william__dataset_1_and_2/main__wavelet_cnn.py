@@ -229,13 +229,13 @@ def main():
     decimate = None
     select_every = 10
 
-    data_file = f"../../data/william/dataset3/preprocessed_data__no_decimate.csv"
-    fig_folder = "../../fig/william/main__wavelet_cnn/dataset3"
+    data_file = f"../../data/william/dataset2/preprocessed_data__no_decimate.csv"
+    fig_folder = "../../fig/william/main__wavelet_cnn/dataset2"
 
     train(
         data_file=data_file,
         fig_folder=fig_folder,
-        learning_rate=0.001,
+        learning_rate=0.005,
         seed=12,
         wavelet=wavelet,
         scales=scales,
